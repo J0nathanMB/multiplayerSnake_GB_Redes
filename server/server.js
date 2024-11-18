@@ -1,4 +1,10 @@
-const io = require('socket.io')();
+const io = require('socket.io')(process.env.PORT || 3000, {
+  cors: {
+    origin: "https://snakegame-redes-gb.netlify.app", // Permitir todas as origens
+    methods: ["GET", "POST"], // Métodos permitidos
+    credentials: true, // Permitir cookies, se necessário
+  }
+});
 const { initGame, gameLoop, getUpdatedVelocity } = require('./game');
 const { FRAME_RATE } = require('./constants');
 const { makeid } = require('./utils');

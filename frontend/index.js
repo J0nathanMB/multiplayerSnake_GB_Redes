@@ -3,11 +3,7 @@ const SNAKE_COLOUR = '#c2c2c2';
 const FOOD_COLOUR = '#e66916';
 
 // const socket = io('https://multiplayersnake-gb-redes.onrender.com');
-const socket = io('https://multiplayersnake-gb-redes.onrender.com', {
-  extraHeaders: {
-    "Access-Control-Allow-Origin": "*"
-  }
-});
+const socket = io('https://multiplayersnake-gb-redes.onrender.com');
 
 socket.on('init', handleInit);
 socket.on('gameState', handleGameState);
