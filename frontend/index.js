@@ -2,7 +2,7 @@ const BG_COLOUR = '#231f20';
 const SNAKE_COLOUR = '#c2c2c2';
 const FOOD_COLOUR = '#e66916';
 
-const socket = io('http://localhost:3000');
+const socket = io('https://multiplayersnake-gb-redes.onrender.com');
 // const socket = io('http://192.168.196.170:3000', {
 //   extraHeaders: {
 //     "Access-Control-Allow-Origin": "*"
