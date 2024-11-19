@@ -1,31 +1,35 @@
-const io = require('socket.io')({
+const io = require('socket.io')(process.env.PORT || 3000, {
   cors: {
-    origin: '*', // Permite qualquer origem
-    methods: ['GET', 'POST'], // Métodos permitidos
-  },
+    origin: "https://snakegame-redes-gb.netlify.app", // Permitir todas as origens
+    methods: ["GET", "POST"], // Métodos permitidos
+    credentials: true, // Permitir cookies, se necessário
+  }
 });
-const cors = require('cors'); // Middleware CORS
-const express = require('express'); // Requerido para o uso do cors
 const { initGame, gameLoop, getUpdatedVelocity } = require('./game');
 const { FRAME_RATE } = require('./constants');
 const { makeid } = require('./utils');
 
-const app = express();
-app.use(cors()); // Aplica o middleware CORS
-app.get('/', (req, res) => res.send('Server is running!')); // Rota básica para teste
-
 const state = {};
 const clientRooms = {};
 
-io.on('connection', (client) => {
+io.on('connection', client => {
+
   client.on('keydown', handleKeydown);
   client.on('newGame', handleNewGame);
   client.on('joinGame', handleJoinGame);
 
   function handleJoinGame(roomName) {
-    const room = io.sockets.adapter.rooms.get(roomName);
+    const room = io.sockets.adapter.rooms[roomName];
 
-    let numClients = room ? room.size : 0;
+    let allUsers;
+    if (room) {
+      allUsers = room.sockets;
+    }
+
+    let numClients = 0;
+    if (allUsers) {
+      numClients = Object.keys(allUsers).length;
+    }
 
     if (numClients === 0) {
       client.emit('unknownCode');
@@ -36,10 +40,11 @@ io.on('connection', (client) => {
     }
 
     clientRooms[client.id] = roomName;
+
     client.join(roomName);
     client.number = 2;
     client.emit('init', 2);
-
+    
     startGameInterval(roomName);
   }
 
@@ -47,9 +52,10 @@ io.on('connection', (client) => {
     let roomName = makeid(5);
     clientRooms[client.id] = roomName;
     client.emit('gameCode', roomName);
+  
 
     state[roomName] = initGame();
-
+  
     client.join(roomName);
     client.number = 1;
     client.emit('init', 1);
@@ -57,13 +63,14 @@ io.on('connection', (client) => {
 
   function handleKeydown(keyCode) {
     const roomName = clientRooms[client.id];
-    if (!roomName) {
-      return;
+    if (!roomName || !state[roomName]) {
+      console.error(`Invalid room or state for client: ${client.id}`);
+      return; 
     }
     try {
       keyCode = parseInt(keyCode);
     } catch (e) {
-      console.error(e);
+      console.error(`Invalid keyCode: ${keyCode}`, e);
       return;
     }
 
@@ -77,25 +84,46 @@ io.on('connection', (client) => {
 
 function startGameInterval(roomName) {
   const intervalId = setInterval(() => {
+    if (!state[roomName]) {
+      console.error(`State for room ${roomName} is null. Clearing interval.`);
+      clearInterval(intervalId);
+      return;
+    }
+
     const winner = gameLoop(state[roomName]);
 
     if (!winner) {
       emitGameState(roomName, state[roomName]);
     } else {
       emitGameOver(roomName, winner);
-      state[roomName] = null;
+
+      // Limpar o estado e remover os jogadores da sala
       clearInterval(intervalId);
+      delete state[roomName];
+      
+      const clientsInRoom = io.sockets.adapter.rooms[roomName]?.sockets;
+      if (clientsInRoom) {
+        for (const clientId of Object.keys(clientsInRoom)) {
+          const client = io.sockets.sockets.get(clientId);
+          if (client) {
+            client.leave(roomName); // Remove o cliente da sala
+            client.emit('returnToMenu'); // Envia evento para resetar o front-end
+          }
+        }
+      }
     }
   }, 1000 / FRAME_RATE);
 }
 
 function emitGameState(room, gameState) {
-  io.to(room).emit('gameState', JSON.stringify(gameState));
+  // Send this event to everyone in the room.
+  io.sockets.in(room)
+    .emit('gameState', JSON.stringify(gameState));
 }
 
 function emitGameOver(room, winner) {
-  io.to(room).emit('gameOver', JSON.stringify({ winner }));
+  io.sockets.in(room)
+    .emit('gameOver', JSON.stringify({ winner }));
 }
 
-const PORT = process.env.PORT || 3000;
-io.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+// io.listen(process.env.PORT || 3000);
