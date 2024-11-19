@@ -90,7 +90,13 @@ function startGameInterval(roomName) {
 }
 
 function emitGameState(room, gameState) {
-  io.to(room).emit('gameState', JSON.stringify(gameState));
+  const clients = Array.from(io.sockets.adapter.rooms.get(room) || []);
+  for (const clientId of clients) {
+    const client = io.of('/').sockets.get(clientId); // Substituído para versões recentes
+    if (client) {
+      client.emit('gameState', JSON.stringify(gameState));
+    }
+  }
 }
 
 function emitGameOver(room, winner) {
