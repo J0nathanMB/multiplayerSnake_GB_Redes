@@ -52,9 +52,10 @@ io.on('connection', client => {
     let roomName = makeid(5);
     clientRooms[client.id] = roomName;
     client.emit('gameCode', roomName);
+  
 
     state[roomName] = initGame();
-
+  
     client.join(roomName);
     client.number = 1;
     client.emit('init', 1);
@@ -62,13 +63,14 @@ io.on('connection', client => {
 
   function handleKeydown(keyCode) {
     const roomName = clientRooms[client.id];
-    if (!roomName) {
-      return;
+    if (!roomName || !state[roomName]) {
+      console.error(`Invalid room or state for client: ${client.id}`);
+      return; 
     }
     try {
       keyCode = parseInt(keyCode);
-    } catch(e) {
-      console.error(e);
+    } catch (e) {
+      console.error(`Invalid keyCode: ${keyCode}`, e);
       return;
     }
 
@@ -82,14 +84,33 @@ io.on('connection', client => {
 
 function startGameInterval(roomName) {
   const intervalId = setInterval(() => {
+    if (!state[roomName]) {
+      console.error(`State for room ${roomName} is null. Clearing interval.`);
+      clearInterval(intervalId);
+      return;
+    }
+
     const winner = gameLoop(state[roomName]);
-    
+
     if (!winner) {
-      emitGameState(roomName, state[roomName])
+      emitGameState(roomName, state[roomName]);
     } else {
       emitGameOver(roomName, winner);
-      state[roomName] = null;
+
+      // Limpar o estado e remover os jogadores da sala
       clearInterval(intervalId);
+      delete state[roomName];
+      
+      const clientsInRoom = io.sockets.adapter.rooms[roomName]?.sockets;
+      if (clientsInRoom) {
+        for (const clientId of Object.keys(clientsInRoom)) {
+          const client = io.sockets.sockets.get(clientId);
+          if (client) {
+            client.leave(roomName); // Remove o cliente da sala
+            client.emit('returnToMenu'); // Envia evento para resetar o front-end
+          }
+        }
+      }
     }
   }, 1000 / FRAME_RATE);
 }

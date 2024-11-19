@@ -11,6 +11,7 @@ socket.on('gameOver', handleGameOver);
 socket.on('gameCode', handleGameCode);
 socket.on('unknownCode', handleUnknownCode);
 socket.on('tooManyPlayers', handleTooManyPlayers);
+socket.on('returnToMenu', handleReturnToMenu); // Novo evento para retornar ao menu
 
 const gameScreen = document.getElementById('gameScreen');
 const initialScreen = document.getElementById('initialScreen');
@@ -22,6 +23,9 @@ const gameCodeDisplay = document.getElementById('gameCodeDisplay');
 newGameBtn.addEventListener('click', newGame);
 joinGameBtn.addEventListener('click', joinGame);
 
+let canvas, ctx;
+let playerNumber;
+let gameActive = false;
 
 function newGame() {
   socket.emit('newGame');
@@ -34,11 +38,8 @@ function joinGame() {
   init();
 }
 
-let canvas, ctx;
-let playerNumber;
-let gameActive = false;
-
 function init() {
+  reset(); // Garante que tudo esteja limpo antes de começar
   initialScreen.style.display = "none";
   gameScreen.style.display = "block";
 
@@ -55,6 +56,7 @@ function init() {
 }
 
 function keydown(e) {
+  if (!gameActive) return; // Evita eventos enquanto o jogo está inativo
   socket.emit('keydown', e.keyCode);
 }
 
@@ -70,12 +72,15 @@ function paintGame(state) {
   ctx.fillRect(food.x * size, food.y * size, size, size);
 
   paintPlayer(state.players[0], size, SNAKE_COLOUR);
-  paintPlayer(state.players[1], size, 'red');
+  if (state.players[1]) {
+    paintPlayer(state.players[1], size, 'red');
+  }
 }
 
 function paintPlayer(playerState, size, colour) {
+  if (!playerState || !playerState.snake) return;
+  
   const snake = playerState.snake;
-
   ctx.fillStyle = colour;
   for (let cell of snake) {
     ctx.fillRect(cell.x * size, cell.y * size, size, size);
@@ -87,19 +92,16 @@ function handleInit(number) {
 }
 
 function handleGameState(gameState) {
-  if (!gameActive) {
-    return;
-  }
+  if (!gameActive) return;
+  
   gameState = JSON.parse(gameState);
   requestAnimationFrame(() => paintGame(gameState));
 }
 
 function handleGameOver(data) {
-  if (!gameActive) {
-    return;
-  }
-  data = JSON.parse(data);
+  if (!gameActive) return;
 
+  data = JSON.parse(data);
   gameActive = false;
 
   if (data.winner === playerNumber) {
@@ -107,6 +109,8 @@ function handleGameOver(data) {
   } else {
     alert('You Lose :(');
   }
+
+  reset(); // Retorna ao menu após o jogo acabar
 }
 
 function handleGameCode(gameCode) {
@@ -115,7 +119,7 @@ function handleGameCode(gameCode) {
 
 function handleUnknownCode() {
   reset();
-  alert('Unknown Game Code')
+  alert('Unknown Game Code');
 }
 
 function handleTooManyPlayers() {
@@ -123,9 +127,23 @@ function handleTooManyPlayers() {
   alert('This game is already in progress');
 }
 
+function handleReturnToMenu() {
+  reset();
+  alert('Game Over! Returning to menu.');
+}
+
 function reset() {
   playerNumber = null;
   gameCodeInput.value = '';
   initialScreen.style.display = "block";
   gameScreen.style.display = "none";
+
+  // Limpar canvas
+  if (ctx) {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+  }
+
+  // Remover eventos
+  document.removeEventListener('keydown', keydown);
+  gameActive = false;
 }
