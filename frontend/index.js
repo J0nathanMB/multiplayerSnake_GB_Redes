@@ -3,7 +3,6 @@ const SNAKE_COLOUR = '#c2c2c2';
 const FOOD_COLOUR = '#e66916';
 
 // const socket = io('https://multiplayersnake-gb-redes.onrender.com');
-import { io } from "socket.io-client";
 
 const socket = io("http://localhost:3000", {
   transports: ["websocket"], // Forçar WebSocket para evitar polling
