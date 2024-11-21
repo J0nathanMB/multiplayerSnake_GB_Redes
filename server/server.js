@@ -1,6 +1,6 @@
 const io = require('socket.io')(process.env.PORT || 3000, {
   cors: {
-    origin: "*", // Permitir todas as origens
+    origin: "https://snakegame-redes-gb.netlify.app", // Permitir todas as origens
     methods: ["GET", "POST"], // Métodos permitidos
     credentials: true, // Permitir cookies, se necessário
   }
@@ -13,22 +13,19 @@ const state = {};
 const clientRooms = {};
 
 io.on('connection', client => {
+  console.log(`Client connected: ${client.id}`);
 
   client.on('keydown', handleKeydown);
   client.on('newGame', handleNewGame);
   client.on('joinGame', handleJoinGame);
+  client.on('disconnect', handleDisconnect);
 
   function handleJoinGame(roomName) {
-    const room = io.sockets.adapter.rooms[roomName];
-
-    let allUsers;
-    if (room) {
-      allUsers = room.sockets;
-    }
+    const room = io.sockets.adapter.rooms.get(roomName);
 
     let numClients = 0;
-    if (allUsers) {
-      numClients = Object.keys(allUsers).length;
+    if (room) {
+      numClients = room.size;
     }
 
     if (numClients === 0) {
@@ -44,7 +41,7 @@ io.on('connection', client => {
     client.join(roomName);
     client.number = 2;
     client.emit('init', 2);
-    
+
     startGameInterval(roomName);
   }
 
@@ -52,10 +49,9 @@ io.on('connection', client => {
     let roomName = makeid(5);
     clientRooms[client.id] = roomName;
     client.emit('gameCode', roomName);
-  
 
     state[roomName] = initGame();
-  
+
     client.join(roomName);
     client.number = 1;
     client.emit('init', 1);
@@ -65,7 +61,7 @@ io.on('connection', client => {
     const roomName = clientRooms[client.id];
     if (!roomName || !state[roomName]) {
       console.error(`Invalid room or state for client: ${client.id}`);
-      return; 
+      return;
     }
     try {
       keyCode = parseInt(keyCode);
@@ -78,6 +74,14 @@ io.on('connection', client => {
 
     if (vel) {
       state[roomName].players[client.number - 1].vel = vel;
+    }
+  }
+
+  function handleDisconnect() {
+    const roomName = clientRooms[client.id];
+    if (roomName) {
+      console.log(`Client disconnected: ${client.id} from room: ${roomName}`);
+      delete clientRooms[client.id];
     }
   }
 });
@@ -100,11 +104,11 @@ function startGameInterval(roomName) {
       // Limpar o estado e remover os jogadores da sala
       clearInterval(intervalId);
       delete state[roomName];
-      
-      const clientsInRoom = io.sockets.adapter.rooms[roomName]?.sockets;
+
+      const clientsInRoom = io.sockets.adapter.rooms.get(roomName);
       if (clientsInRoom) {
-        for (const clientId of Object.keys(clientsInRoom)) {
-          const client = io.sockets.sockets.get(clientId);
+        for (const clientId of clientsInRoom) {
+          const client = io.of('/').sockets.get(clientId); // Ajustado para acessar corretamente os sockets
           if (client) {
             client.leave(roomName); // Remove o cliente da sala
             client.emit('returnToMenu'); // Envia evento para resetar o front-end
@@ -116,14 +120,11 @@ function startGameInterval(roomName) {
 }
 
 function emitGameState(room, gameState) {
-  // Send this event to everyone in the room.
-  io.sockets.in(room)
-    .emit('gameState', JSON.stringify(gameState));
+  io.sockets.in(room).emit('gameState', JSON.stringify(gameState));
 }
 
 function emitGameOver(room, winner) {
-  io.sockets.in(room)
-    .emit('gameOver', JSON.stringify({ winner }));
+  io.sockets.in(room).emit('gameOver', JSON.stringify({ winner }));
 }
 
-// io.listen(process.env.PORT || 3000);
+console.log(`Server running on port ${process.env.PORT || 3000}`);
