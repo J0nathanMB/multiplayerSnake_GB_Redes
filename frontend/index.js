@@ -3,7 +3,22 @@ const SNAKE_COLOUR = '#c2c2c2';
 const FOOD_COLOUR = '#e66916';
 
 // const socket = io('https://multiplayersnake-gb-redes.onrender.com');
-const socket = io('http://localhost:3000');
+import { io } from "socket.io-client";
+
+const socket = io("http://localhost:3000", {
+  transports: ["websocket"], // Forçar WebSocket para evitar polling
+  withCredentials: true,    // Suporte a cookies e credenciais
+});
+
+socket.on("connect", () => {
+  console.log(`Conectado ao servidor: ${socket.id}`);
+});
+
+socket.on("disconnect", () => {
+  console.log("Desconectado do servidor.");
+});
+
+socket.emit("test");
 
 socket.on('init', handleInit);
 socket.on('gameState', handleGameState);
