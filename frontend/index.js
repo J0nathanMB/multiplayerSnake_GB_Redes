@@ -5,7 +5,6 @@ const FOOD_COLOUR = '#e66916';
 // const socket = io('http://localhost:3000');
 
 const socket = io("https://multiplayersnake-gb-redes.onrender.com", {
-  transports: ["websocket"], // Forçar WebSocket para evitar polling
   withCredentials: true,    // Suporte a cookies e credenciais
 });
 
